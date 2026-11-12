@@ -47,8 +47,8 @@ const DEFAULT_LOCATIONS: LocationItem[] = [
 const DEFAULT_SETTINGS: SystemSettings = {
   organizationName: 'งานจัดการหอพักบุคลากร กองอาคารสถานที่',
   departmentName: 'มหาวิทยาลัยนเรศวร',
-  officerPasscode: 'admin123',
-  officerUsername: 'officer',
+  officerPasscode: 'sdnu12345',
+  officerUsername: 'admin',
   fiscalYearCurrent: '2568',
   contactPhone: '055-961000',
   contactEmail: 'dormstaff2009@gmail.com',
@@ -445,16 +445,19 @@ function appendLog(
 // 1. Auth Endpoint (Server verification)
 app.post('/api/auth/login', (req, res) => {
   const { passcode, username } = req.body;
-  const currentPasscode = dbState.settings.officerPasscode || 'admin123';
-  const currentUsername = dbState.settings.officerUsername || 'officer';
+  const currentPasscode = dbState.settings.officerPasscode || 'sdnu12345';
+  const currentUsername = dbState.settings.officerUsername || 'admin';
 
   if (!passcode) {
     return res.status(400).json({ success: false, message: 'กรุณากรอกรหัสผ่านเจ้าหน้าที่' });
   }
 
-  // Allow passcode match or user+pass match
-  const isMatch = passcode === currentPasscode || 
-                  (passcode === 'admin123' || passcode === '123456');
+  // Require username "admin" and password "sdnu12345"
+  const cleanUsername = (username || '').trim().toLowerCase();
+  const cleanPasscode = (passcode || '').trim();
+
+  const isMatch = (cleanUsername === 'admin' && cleanPasscode === 'sdnu12345') ||
+                  (cleanPasscode === currentPasscode && (cleanUsername === currentUsername.toLowerCase() || !cleanUsername));
 
   if (isMatch) {
     const token = 'officer-session-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
@@ -462,8 +465,8 @@ app.post('/api/auth/login', (req, res) => {
       success: true,
       token,
       officer: {
-        username: username || currentUsername,
-        name: 'เจ้าหน้าที่ผู้ดูแลระบบพัสดุ',
+        username: 'admin',
+        name: 'เจ้าหน้าที่ผู้ดูแลระบบพัสดุหอพักบุคลากร',
         role: 'OFFICER'
       }
     });
@@ -471,7 +474,7 @@ app.post('/api/auth/login', (req, res) => {
 
   return res.status(401).json({
     success: false,
-    message: 'รหัสผ่านเจ้าหน้าที่ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง'
+    message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (User: admin / Password: sdnu12345)'
   });
 });
 

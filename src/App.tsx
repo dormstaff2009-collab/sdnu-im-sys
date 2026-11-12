@@ -22,6 +22,7 @@ import { CategoryLocationModal } from './components/CategoryLocationModal';
 import { SettingsModal } from './components/SettingsModal';
 import { PrintLabelsModal } from './components/PrintLabelsModal';
 import { OfficerLoginModal } from './components/OfficerLoginModal';
+import { ConfirmationModal } from './components/ConfirmationModal';
 import { LogsView } from './components/LogsView';
 import { exportAssetsToCSV } from './utils/exportUtils';
 import { 
@@ -39,7 +40,7 @@ import {
   seedDemoDataToFirestore,
   clearAssetsInFirestore
 } from './lib/firestoreService';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Lock, ShieldCheck, Eye, LogOut } from 'lucide-react';
 
 export default function App() {
   // App state
@@ -50,8 +51,8 @@ export default function App() {
   const [settings, setSettings] = useState<SystemSettings>({
     organizationName: 'งานจัดการหอพักบุคลากร กองอาคารสถานที่',
     departmentName: 'มหาวิทยาลัยนเรศวร',
-    officerPasscode: 'admin123',
-    officerUsername: 'officer',
+    officerPasscode: 'sdnu12345',
+    officerUsername: 'admin',
     fiscalYearCurrent: '2568',
     contactPhone: '055-961000',
     contactEmail: 'dormstaff2009@gmail.com',
@@ -98,10 +99,32 @@ export default function App() {
   // Notification Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // In-App Confirmation Modal state (Reliable across all browsers and iFrames)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => Promise<void> | void;
+    isLoading?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // Track if database has been initialized to avoid unwanted auto-reseeding after clearing
+  const [isInitialized, setIsInitialized] = useState<boolean>(() => {
+    return localStorage.getItem('app_db_initialized') === 'true';
+  });
 
   // Load Data: Primary from Cloud Firestore in project sdnu-im-sys, with fallback to API
   const loadData = useCallback(async () => {
@@ -109,7 +132,8 @@ export default function App() {
       // First attempt Firestore load
       const firestoreData = await getFirestoreData();
       
-      if (firestoreData.assets.length > 0 || firestoreData.categories.length > 0) {
+      // If Firestore has any records, use them
+      if (firestoreData.assets.length > 0 || firestoreData.categories.length > 0 || firestoreData.logs.length > 0 || firestoreData.settings) {
         setAssets(firestoreData.assets);
         setCategories(firestoreData.categories);
         setLocations(firestoreData.locations);
@@ -117,10 +141,19 @@ export default function App() {
         if (firestoreData.settings) {
           setSettings(prev => ({ ...prev, ...firestoreData.settings }));
         }
+        localStorage.setItem('app_db_initialized', 'true');
+        setIsInitialized(true);
         return;
       }
 
-      // If Firestore is empty (initial deployment), fetch default seed data from server and seed Firestore
+      // If Firestore is empty AND system was already initialized, keep assets empty (do NOT auto-seed)
+      const alreadyInit = localStorage.getItem('app_db_initialized') === 'true';
+      if (alreadyInit) {
+        setAssets([]);
+        return;
+      }
+
+      // If brand new deployment never initialized, fetch default seed data from server and seed Firestore
       const res = await fetch('/api/data');
       if (res.ok) {
         const data = await res.json();
@@ -142,6 +175,8 @@ export default function App() {
             data.settings || settings
           ).catch(e => console.warn('Could not auto-seed Firestore:', e));
         }
+        localStorage.setItem('app_db_initialized', 'true');
+        setIsInitialized(true);
       }
     } catch (err) {
       console.warn('Firestore load failed, falling back to server API:', err);
@@ -176,7 +211,7 @@ export default function App() {
   }, [assets]);
 
   // ======================== AUTHENTICATION ========================
-  const handleServerLogin = async (passcode: string, username = 'officer') => {
+  const handleServerLogin = async (passcode: string, username = 'admin') => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -299,25 +334,32 @@ export default function App() {
     }
   };
 
-  const handleDeleteAsset = async (asset: Asset) => {
-    if (!window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบครุภัณฑ์ "${asset.name}" (${asset.assetNumber}) จากฐานข้อมูล Firebase?`)) {
-      return;
-    }
+  const handleDeleteAsset = (asset: Asset) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการลบครุภัณฑ์',
+      message: `คุณแน่ใจหรือไม่ว่าต้องการลบครุภัณฑ์ "${asset.name}" (เลข: ${asset.assetNumber})?\nการกระทำนี้จะลบข้อมูลออกจากฐานข้อมูลถาวร`,
+      confirmText: 'ลบข้อมูล',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteAssetFromFirestore(asset.id);
+          await logAction(asset.id, asset.assetNumber, asset.name, 'DELETED', 'ลบรายการครุภัณฑ์ออกจากระบบ');
 
-    try {
-      await deleteAssetFromFirestore(asset.id);
-      await logAction(asset.id, asset.assetNumber, asset.name, 'DELETED', 'ลบรายการครุภัณฑ์ออกจากระบบ');
+          fetch(`/api/assets/${asset.id}`, { method: 'DELETE' }).catch(() => {});
 
-      fetch(`/api/assets/${asset.id}`, { method: 'DELETE' }).catch(() => {});
-
-      showToast('ลบรายการครุภัณฑ์ออกจาก Firebase เรียบร้อยแล้ว');
-      if (selectedAssetForView?.id === asset.id) {
-        setSelectedAssetForView(null);
+          showToast('ลบรายการครุภัณฑ์เรียบร้อยแล้ว');
+          if (selectedAssetForView?.id === asset.id) {
+            setSelectedAssetForView(null);
+          }
+          await loadData();
+        } catch {
+          showToast('เกิดข้อผิดพลาดในการลบครุภัณฑ์', 'error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       }
-      await loadData();
-    } catch {
-      showToast('เกิดข้อผิดพลาดในการลบครุภัณฑ์', 'error');
-    }
+    });
   };
 
   // ======================== CAMERA & IMAGE OPS ========================
@@ -395,23 +437,33 @@ export default function App() {
     input.click();
   };
 
-  const handleDeleteImageForExistingAsset = async (asset: Asset) => {
-    if (!window.confirm('คุณต้องการลบรูปภาพของครุภัณฑ์นี้ใช่หรือไม่?')) return;
-    try {
-      await updateAssetInFirestore(asset.id, { imageUrl: '', updatedAt: new Date().toISOString() });
-      await logAction(asset.id, asset.assetNumber, asset.name, 'IMAGE_CHANGED', 'ลบรูปภาพครุภัณฑ์');
+  const handleDeleteImageForExistingAsset = (asset: Asset) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการลบรูปภาพ',
+      message: `คุณต้องการลบรูปภาพของครุภัณฑ์ "${asset.name}" ใช่หรือไม่?`,
+      confirmText: 'ลบรูปภาพ',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await updateAssetInFirestore(asset.id, { imageUrl: '', updatedAt: new Date().toISOString() });
+          await logAction(asset.id, asset.assetNumber, asset.name, 'IMAGE_CHANGED', 'ลบรูปภาพครุภัณฑ์');
 
-      fetch(`/api/assets/${asset.id}/image`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: '' })
-      }).catch(() => {});
+          fetch(`/api/assets/${asset.id}/image`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl: '' })
+          }).catch(() => {});
 
-      showToast('ลบรูปภาพเรียบร้อยแล้ว');
-      await loadData();
-    } catch {
-      showToast('ไม่สามารถลบรูปภาพได้', 'error');
-    }
+          showToast('ลบรูปภาพเรียบร้อยแล้ว');
+          await loadData();
+        } catch {
+          showToast('ไม่สามารถลบรูปภาพได้', 'error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   // ======================== LIFECYCLE (Transfer, Borrow, Return, Repair) ========================
@@ -604,17 +656,27 @@ export default function App() {
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    if (!window.confirm('คุณต้องการลบหมวดนี้ใช่หรือไม่?')) return false;
-    try {
-      await deleteCategoryFromFirestore(id);
-      fetch(`/api/categories/${id}`, { method: 'DELETE' }).catch(() => {});
-      showToast('ลบหมวดครุภัณฑ์เรียบร้อย');
-      await loadData();
-      return true;
-    } catch {
-      return false;
-    }
+  const handleDeleteCategory = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการลบหมวดครุภัณฑ์',
+      message: 'คุณต้องการลบหมวดครุภัณฑ์นี้ใช่หรือไม่?',
+      confirmText: 'ลบหมวด',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteCategoryFromFirestore(id);
+          fetch(`/api/categories/${id}`, { method: 'DELETE' }).catch(() => {});
+          showToast('ลบหมวดครุภัณฑ์เรียบร้อย');
+          await loadData();
+        } catch {
+          showToast('ไม่สามารถลบหมวดได้', 'error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+    return Promise.resolve(true);
   };
 
   const handleAddLocation = async (locData: { name: string; building: string; floor?: string; room?: string }) => {
@@ -641,55 +703,120 @@ export default function App() {
     }
   };
 
-  const handleDeleteLocation = async (id: string) => {
-    if (!window.confirm('คุณต้องการลบสถานที่นี้ใช่หรือไม่?')) return false;
-    try {
-      await deleteLocationFromFirestore(id);
-      fetch(`/api/locations/${id}`, { method: 'DELETE' }).catch(() => {});
-      showToast('ลบสถานที่จัดเก็บเรียบร้อย');
-      await loadData();
-      return true;
-    } catch {
-      return false;
-    }
+  const handleDeleteLocation = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'ยืนยันการลบสถานที่จัดเก็บ',
+      message: 'คุณต้องการลบสถานที่จัดเก็บนี้ใช่หรือไม่?',
+      confirmText: 'ลบสถานที่',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteLocationFromFirestore(id);
+          fetch(`/api/locations/${id}`, { method: 'DELETE' }).catch(() => {});
+          showToast('ลบสถานที่จัดเก็บเรียบร้อย');
+          await loadData();
+        } catch {
+          showToast('ไม่สามารถลบสถานที่ได้', 'error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+    return Promise.resolve(true);
   };
 
   // ======================== DEMO DATA OPS (Firebase Sync) ========================
-  const handleGenerateDemo = async () => {
-    if (!window.confirm('ต้องการสร้างชุดข้อมูลตัวอย่าง 12 รายการบันทึกลง Cloud Firestore (sdnu-im-sys) หรือไม่?')) {
+  const handleGenerateDemo = () => {
+    if (!isOfficer) {
+      showToast('กรุณาเข้าสู่ระบบเจ้าหน้าที่ (admin / sdnu12345) ก่อนสร้างข้อมูล Demo', 'error');
+      setIsLoginOpen(true);
       return;
     }
-    try {
-      const res = await fetch('/api/demo/generate', { method: 'POST' });
-      const data = await res.json();
-      if (data.success && data.data) {
-        await seedDemoDataToFirestore(
-          data.data.assets,
-          data.data.categories,
-          data.data.locations,
-          data.data.logs,
-          data.data.settings
-        );
-        showToast('บันทึกข้อมูลตัวอย่าง 12 รายการลง Firebase (sdnu-im-sys) สำเร็จ');
-        await loadData();
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'สร้างชุดข้อมูลตัวอย่าง (Demo Data)',
+      message: 'ต้องการสร้างชุดข้อมูลครุภัณฑ์ตัวอย่าง 12 รายการ และบันทึกลง Cloud Firestore (sdnu-im-sys) หรือไม่?\nข้อมูลจะครอบคลุมทุกหมวดและสถานะสำหรับทดสอบระบบ',
+      confirmText: 'สร้าง Demo (12 รายการ)',
+      cancelText: 'ยกเลิก',
+      isDestructive: false,
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/demo/generate', { method: 'POST' });
+          const data = await res.json();
+          if (data.success && data.data) {
+            setAssets(data.data.assets || []);
+            setCategories(data.data.categories || []);
+            setLocations(data.data.locations || []);
+            setLogs(data.data.logs || []);
+            localStorage.setItem('app_db_initialized', 'true');
+            setIsInitialized(true);
+
+            // Sync to Cloud Firestore sdnu-im-sys
+            seedDemoDataToFirestore(
+              data.data.assets,
+              data.data.categories,
+              data.data.locations,
+              data.data.logs,
+              data.data.settings
+            ).catch(e => console.warn('Firestore seed warning:', e));
+
+            showToast('สร้างชุดข้อมูลตัวอย่าง 12 รายการเรียบร้อยแล้ว');
+          }
+        } catch (err) {
+          console.error(err);
+          showToast('เกิดข้อผิดพลาดในการสร้างข้อมูลตัวอย่าง', 'error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       }
-    } catch {
-      showToast('เกิดข้อผิดพลาดในการสร้างข้อมูลตัวอย่าง', 'error');
-    }
+    });
   };
 
-  const handleClearDemo = async () => {
-    if (!window.confirm('⚠️ คำเตือน: คุณต้องการล้างข้อมูลครุภัณฑ์ทั้งหมดจาก Cloud Firestore (sdnu-im-sys) ใช่หรือไม่?')) {
+  const handleClearDemo = () => {
+    if (!isOfficer) {
+      showToast('กรุณาเข้าสู่ระบบเจ้าหน้าที่ (admin / sdnu12345) ก่อนล้างข้อมูล Demo', 'error');
+      setIsLoginOpen(true);
       return;
     }
-    try {
-      await clearAssetsInFirestore();
-      fetch('/api/demo/clear', { method: 'POST' }).catch(() => {});
-      showToast('ล้างข้อมูลครุภัณฑ์ทั้งหมดออกจาก Firebase เรียบร้อย');
-      await loadData();
-    } catch {
-      showToast('ไม่สามารถล้างข้อมูลได้', 'error');
-    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: '⚠️ ล้างข้อมูลครุภัณฑ์ทั้งหมด (Clear All Demo Data)',
+      message: 'คุณต้องการล้างข้อมูลครุภัณฑ์ทั้งหมดออกจากระบบและ Cloud Firestore (sdnu-im-sys) ใช่หรือไม่?\nรายการครุภัณฑ์ทั้งหมดจะถูกลบออกและกลายเป็นรายการว่างเปล่า (0 รายการ)',
+      confirmText: 'ยืนยันล้างข้อมูลทั้งหมด',
+      cancelText: 'ยกเลิก',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          // 1. Immediately reset React state so UI updates with 0 latency
+          setAssets([]);
+          localStorage.setItem('app_db_initialized', 'true');
+          setIsInitialized(true);
+
+          // 2. Call backend clear endpoint
+          await fetch('/api/demo/clear', { method: 'POST' }).catch(e => console.warn('Backend clear err:', e));
+
+          // 3. Clear Firestore assets in sdnu-im-sys
+          try {
+            await clearAssetsInFirestore();
+          } catch (fsErr) {
+            console.warn('Firestore clear error:', fsErr);
+          }
+
+          // 4. Record action log
+          await logAction('-', '-', 'ระบบ', 'DELETED', 'ล้างข้อมูลครุภัณฑ์ทั้งหมด (Clear Demo)');
+
+          showToast('ล้างข้อมูลครุภัณฑ์ทั้งหมดเรียบร้อยแล้ว (ฐานข้อมูลว่างเปล่า 0 รายการ)');
+        } catch (err) {
+          console.error(err);
+          showToast('เกิดข้อผิดพลาดในการล้างข้อมูล', 'error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   // ======================== SETTINGS SAVE ========================
@@ -760,7 +887,58 @@ export default function App() {
         totalAssetsCount={assets.length}
       />
 
-      {/* Main Container */}
+      {/* Mode Status Indicator Banner */}
+      {!isOfficer ? (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200/80 px-4 py-2.5 shadow-2xs">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+            <div className="flex items-center gap-2.5 text-amber-900">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-200 text-amber-800 flex-shrink-0">
+                <Eye className="w-3 h-3" />
+              </span>
+              <div>
+                <span className="font-bold text-amber-950">โหมดผู้เข้าใช้งานทั่วไป (Read-Only):</span>
+                <span className="text-amber-800 ml-1.5">
+                  สามารถดูและตรวจสอบข้อมูลพัสดุครุภัณฑ์ ค้นหา ดู QR Code และดูแดชบอร์ดสรุปผลได้เท่านั้น (ไม่สามารถแก้ไขหรือลบข้อมูลได้)
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsLoginOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition shadow-xs cursor-pointer flex-shrink-0"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>เข้าสู่ระบบเจ้าหน้าที่ (admin / sdnu12345)</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200/80 px-4 py-2.5 shadow-2xs">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+            <div className="flex items-center gap-2.5 text-emerald-950">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-200 text-emerald-800 flex-shrink-0">
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <span className="font-bold text-emerald-950">โหมดเจ้าหน้าที่ (Officer / Admin):</span>
+                <span className="text-emerald-800 ml-1.5">
+                  เข้าถึงทุกฟังก์ชันการใช้งาน สามารถเพิ่ม, แก้ไข, ลบ, โอนย้าย, ยืม-คืน, ส่งซ่อม, พิมพ์สติกเกอร์ และล้าง/สร้าง Demo ได้อย่างสมบูรณ์
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-1 px-3 py-1 text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 font-medium rounded-lg transition cursor-pointer text-xs"
+              >
+                <LogOut className="w-3 h-3 text-slate-500" />
+                <span>ออกจากระบบเจ้าหน้าที่</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         {activeTab === 'catalog' && (
           <AssetListView
@@ -782,6 +960,13 @@ export default function App() {
             onBorrowAsset={(asset) => setBorrowAsset(asset)}
             onReturnAsset={(asset) => setReturnAsset(asset)}
             onRepairAsset={(asset) => setRepairAsset(asset)}
+            onOpenAddAsset={() => {
+              setAssetFormInitialData(null);
+              setIsAssetFormOpen(true);
+            }}
+            onGenerateDemo={handleGenerateDemo}
+            onClearDemo={handleClearDemo}
+            onOpenLogin={() => setIsLoginOpen(true)}
           />
         )}
 
@@ -969,6 +1154,19 @@ export default function App() {
           settings={settings}
         />
       )}
+
+      {/* 12. In-App Confirmation Modal (Ensures reliable actions across iframe & webviews) */}
+      <ConfirmationModal
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        isDestructive={confirmDialog.isDestructive}
+        isLoading={confirmDialog.isLoading}
+      />
     </div>
   );
 }

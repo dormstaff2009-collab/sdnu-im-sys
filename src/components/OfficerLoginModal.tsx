@@ -12,7 +12,7 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({
   onClose,
   onLogin
 }) => {
-  const [username, setUsername] = useState('officer');
+  const [username, setUsername] = useState('admin');
   const [passcode, setPasscode] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +35,7 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({
         setPasscode('');
         onClose();
       } else {
-        setErrorMsg(result.message || 'รหัสผ่านไม่ถูกต้อง');
+        setErrorMsg(result.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
       }
     } catch (err: any) {
       setErrorMsg('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
@@ -59,9 +59,9 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({
           <div className="w-12 h-12 rounded-2xl bg-indigo-600/50 border border-indigo-400/30 flex items-center justify-center mx-auto mb-3 shadow-inner">
             <Lock className="w-6 h-6 text-indigo-200" />
           </div>
-          <h3 className="font-bold text-lg text-white">เข้าสู่ระบบเจ้าหน้าที่</h3>
+          <h3 className="font-bold text-lg text-white">เข้าสู่ระบบเจ้าหน้าที่ (Officer Login)</h3>
           <p className="text-xs text-slate-300 mt-1">
-            ระบบตรวจสอบสิทธิ์จากเซิร์ฟเวอร์ (Server Authentication)
+            เข้าถึงทุกฟังก์ชันการจัดการ เพิ่ม-แก้ไข-ลบ ครุภัณฑ์
           </p>
         </div>
 
@@ -75,22 +75,25 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({
           )}
 
           <div>
-            <label className="block font-medium text-slate-700 mb-1">ชื่อผู้ใช้งานเจ้าหน้าที่</label>
+            <label className="block font-medium text-slate-700 mb-1">
+              ชื่อผู้ใช้งาน (Username) <span className="text-rose-500">*</span>
+            </label>
             <div className="relative">
               <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
+                required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="officer"
-                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                placeholder="admin"
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
 
           <div>
             <label className="block font-medium text-slate-700 mb-1">
-              รหัสผ่านเจ้าหน้าที่ (Officer Passcode) <span className="text-rose-500">*</span>
+              รหัสผ่าน (Password) <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -100,15 +103,27 @@ export const OfficerLoginModal: React.FC<OfficerLoginModalProps> = ({
                 autoFocus
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                placeholder="กรอกรหัสผ่าน (เช่น admin123)"
-                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                placeholder="sdnu12345"
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 font-mono focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
 
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 text-[11px] leading-relaxed">
-            <span className="font-semibold text-slate-700 block mb-0.5">คำแนะนำสำหรับทดสอบระบบ:</span>
-            รหัสผ่านเริ่มต้นของเจ้าหน้าที่คือ: <code className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded">admin123</code> หรือ <code className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded">123456</code> (สามารถเปลี่ยนได้ที่เมนูตั้งค่า)
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 text-[11px] leading-relaxed flex items-center justify-between gap-2">
+            <div>
+              <span className="font-semibold text-slate-700 block mb-0.5">ข้อมูลสำหรับเข้าสู่ระบบ:</span>
+              <div>User: <code className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded">admin</code> | Pass: <code className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded">sdnu12345</code></div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('admin');
+                setPasscode('sdnu12345');
+              }}
+              className="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold px-2 py-1 rounded transition cursor-pointer flex-shrink-0"
+            >
+              กรอกให้อัตโนมัติ
+            </button>
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2">

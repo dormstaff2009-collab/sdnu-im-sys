@@ -17,9 +17,12 @@ import {
   User, 
   Tag, 
   Image as ImageIcon,
-  QrCode,
   Sparkles,
-  Camera
+  Camera,
+  Plus,
+  Lock,
+  ShieldCheck,
+  Inbox
 } from 'lucide-react';
 import type { Asset, Category, LocationItem, AssetStatus, AssetCondition } from '../types/asset';
 import { formatCurrency, formatThaiDate, getStatusBadgeInfo } from '../utils/exportUtils';
@@ -40,6 +43,10 @@ interface AssetListViewProps {
   onBorrowAsset?: (asset: Asset) => void;
   onReturnAsset?: (asset: Asset) => void;
   onRepairAsset?: (asset: Asset) => void;
+  onOpenAddAsset?: () => void;
+  onGenerateDemo?: () => void;
+  onClearDemo?: () => void;
+  onOpenLogin?: () => void;
 }
 
 export const AssetListView: React.FC<AssetListViewProps> = ({
@@ -57,7 +64,11 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
   onTransferAsset,
   onBorrowAsset,
   onReturnAsset,
-  onRepairAsset
+  onRepairAsset,
+  onOpenAddAsset,
+  onGenerateDemo,
+  onClearDemo,
+  onOpenLogin
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(selectedCategoryFilter);
@@ -324,16 +335,70 @@ export const AssetListView: React.FC<AssetListViewProps> = ({
       </div>
 
       {/* Empty State */}
-      {filteredAssets.length === 0 ? (
+      {assets.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-10 sm:p-14 text-center max-w-xl mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-500 mx-auto flex items-center justify-center mb-4">
+            <Inbox className="w-8 h-8 stroke-[1.5]" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900">ฐานข้อมูลครุภัณฑ์ว่างเปล่า (0 รายการ)</h3>
+          <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+            ระบบได้ทำการล้างข้อมูลครุภัณฑ์เรียบร้อยแล้ว หรือยังไม่มีการบันทึกข้อมูลครุภัณฑ์ในระบบ
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            {isOfficer ? (
+              <>
+                {onOpenAddAsset && (
+                  <button
+                    type="button"
+                    onClick={onOpenAddAsset}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ เพิ่มครุภัณฑ์ใหม่</span>
+                  </button>
+                )}
+                {onGenerateDemo && (
+                  <button
+                    type="button"
+                    onClick={onGenerateDemo}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <span>⚡ สร้างข้อมูลตัวอย่าง (Demo 12 รายการ)</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3 w-full">
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg">
+                  ท่านกำลังอยู่ในโหมดผู้เข้าใช้งานทั่วไป (Read-Only) หากต้องการเพิ่มรายการหรือสร้างข้อมูลตัวอย่าง กรุณาเข้าสู่ระบบเจ้าหน้าที่
+                </p>
+                {onOpenLogin && (
+                  <button
+                    type="button"
+                    onClick={onOpenLogin}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>เข้าสู่ระบบเจ้าหน้าที่ (admin / sdnu12345)</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : filteredAssets.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
             <Search className="w-6 h-6" />
           </div>
           <h3 className="text-base font-semibold text-slate-800">ไม่พบรายการครุภัณฑ์ที่ตรงกับเงื่อนไข</h3>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            ลองปรับเปลี่ยนคำค้นหา หรือกดปุ่ม &quot;ล้างตัวกรอง&quot; เพื่อดูครุภัณฑ์ทั้งหมดในระบบ
+            ลองปรับเปลี่ยนคำค้นหา หรือกดปุ่ม &quot;ล้างตัวกรอง&quot; เพื่อดูครุภัณฑ์ทั้งหมดในระบบ ({assets.length} รายการ)
           </p>
           <button
+            type="button"
             onClick={handleResetFilters}
             className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition cursor-pointer"
           >

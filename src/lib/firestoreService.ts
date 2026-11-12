@@ -149,6 +149,9 @@ export async function seedDemoDataToFirestore(
 // 10. Clear Assets in Firestore
 export async function clearAssetsInFirestore(): Promise<void> {
   const assetsSnap = await getDocs(collection(db, ASSETS_COL));
+  if (assetsSnap.empty) {
+    return;
+  }
   const batch = writeBatch(db);
   assetsSnap.docs.forEach(d => {
     batch.delete(d.ref);
