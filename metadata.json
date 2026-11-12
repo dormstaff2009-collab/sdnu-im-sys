@@ -1,0 +1,6 @@
+{
+  "name": "ระบบบริหารจัดการครุภัณฑ์",
+  "description": "ระบบบริหารจัดการครุภัณฑ์ ตรวจสอบ ค้นหา ยืม คืน ซ่อม และควบคุมทะเบียนพัสดุครุภัณฑ์",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

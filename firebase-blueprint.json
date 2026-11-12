@@ -1,0 +1,119 @@
+{
+  "entities": {
+    "Asset": {
+      "title": "Asset",
+      "description": "ครุภัณฑ์และพัสดุครุภัณฑ์ในระบบ",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "รหัสเอกสารครุภัณฑ์" },
+        "assetNumber": { "type": "string", "description": "เลขครุภัณฑ์" },
+        "name": { "type": "string", "description": "ชื่อครุภัณฑ์" },
+        "brand": { "type": "string", "description": "ยี่ห้อ" },
+        "model": { "type": "string", "description": "รุ่น" },
+        "serialNumber": { "type": "string", "description": "หมายเลขซีเรียล" },
+        "responsiblePerson": { "type": "string", "description": "ผู้รับผิดชอบ" },
+        "category": { "type": "string", "description": "หมวดครุภัณฑ์" },
+        "location": { "type": "string", "description": "สถานที่จัดเก็บ/ติดตั้ง" },
+        "status": {
+          "type": "string",
+          "enum": ["ใช้งานปกติ", "อยู่ระหว่างซ่อม", "ชำรุด", "จำหน่ายแล้ว", "สูญหาย"],
+          "description": "สถานะการใช้งาน"
+        },
+        "condition": {
+          "type": "string",
+          "enum": ["ดีมาก", "ดี/พร้อมใช้งาน", "พอใช้", "ชำรุดรอซ่อม", "ชำรุดซ่อมไม่ได้", "สูญหาย"],
+          "description": "สภาพความสมบูรณ์"
+        },
+        "price": { "type": "number", "description": "ราคาจัดซื้อ / มูลค่า (บาท)" },
+        "acquiredDate": { "type": "string", "description": "วันที่ได้มา" },
+        "fiscalYear": { "type": "string", "description": "ปีงบประมาณ" },
+        "budgetSource": { "type": "string", "description": "แหล่งงบประมาณ" },
+        "imageUrl": { "type": "string", "description": "URL หรือ Data URL รูปภาพครุภัณฑ์" },
+        "notes": { "type": "string", "description": "หมายเหตุ" },
+        "borrower": { "type": "object", "description": "ข้อมูลผู้ขอยืมปัจจุบัน" },
+        "repairInfo": { "type": "object", "description": "ข้อมูลการส่งซ่อมบำรุง" },
+        "createdAt": { "type": "string", "description": "วันที่สร้างข้อมูล" },
+        "updatedAt": { "type": "string", "description": "วันที่แก้ไขล่าสุด" }
+      },
+      "required": ["assetNumber", "name", "category", "location", "status", "condition"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "หมวดหมู่ครุภัณฑ์",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name", "code"]
+    },
+    "Location": {
+      "title": "Location",
+      "description": "สถานที่จัดเก็บ/ติดตั้งครุภัณฑ์",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "building": { "type": "string" },
+        "floor": { "type": "string" },
+        "room": { "type": "string" }
+      },
+      "required": ["name", "building"]
+    },
+    "ActionLog": {
+      "title": "ActionLog",
+      "description": "ประวัติการดำเนินงานและวงจรชีวิตครุภัณฑ์",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "assetId": { "type": "string" },
+        "assetNumber": { "type": "string" },
+        "assetName": { "type": "string" },
+        "actionType": { "type": "string" },
+        "details": { "type": "string" },
+        "officerName": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["assetId", "actionType", "details", "timestamp"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "การตั้งค่าระบบและองค์กร",
+      "type": "object",
+      "properties": {
+        "organizationName": { "type": "string" },
+        "departmentName": { "type": "string" },
+        "officerPasscode": { "type": "string" },
+        "officerUsername": { "type": "string" },
+        "fiscalYearCurrent": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "address": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/assets/{assetId}": {
+      "schema": "Asset",
+      "description": "คอลเลกชันรายการครุภัณฑ์ทั้งหมด"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "คอลเลกชันหมวดครุภัณฑ์"
+    },
+    "/locations/{locationId}": {
+      "schema": "Location",
+      "description": "คอลเลกชันสถานที่จัดเก็บ"
+    },
+    "/logs/{logId}": {
+      "schema": "ActionLog",
+      "description": "คอลเลกชันบันทึกประวัติการดำเนินงาน"
+    },
+    "/settings/config": {
+      "schema": "Settings",
+      "description": "เอกสารการตั้งค่าระบบองค์กร"
+    }
+  }
+}
