@@ -27,6 +27,7 @@ interface HeaderProps {
   activeTab: 'catalog' | 'dashboard' | 'logs' | 'labels';
   setActiveTab: (tab: 'catalog' | 'dashboard' | 'logs' | 'labels') => void;
   onOpenLogin: () => void;
+  onInstantLogin?: () => void;
   onLogout: () => void;
   onOpenAddAsset: () => void;
   onOpenCategoriesLocations: () => void;
@@ -44,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   onOpenLogin,
+  onInstantLogin,
   onLogout,
   onOpenAddAsset,
   onOpenCategoriesLocations,
@@ -91,6 +93,17 @@ export const Header: React.FC<HeaderProps> = ({
                   <Eye className="w-3 h-3 text-slate-400" />
                   โหมดตรวจสอบทั่วไป (Read-Only)
                 </span>
+                {onInstantLogin && (
+                  <button
+                    type="button"
+                    onClick={onInstantLogin}
+                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[11px] font-semibold transition cursor-pointer shadow-xs"
+                    title="เข้าสู่ระบบเจ้าหน้าที่ทันที (admin)"
+                  >
+                    <ShieldCheck className="w-3 h-3 text-emerald-200" />
+                    <span>⚡ เข้าสู่ระบบทันที (admin)</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onOpenLogin}
